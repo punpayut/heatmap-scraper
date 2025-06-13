@@ -1,0 +1,23 @@
+name: TradingView Scraper
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - run: |
+          pip install selenium pandas requests jinja2
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser
+          python scraper.py
+      - uses: actions/upload-artifact@v3
+        with:
+          name: heatmap-results
+          path: "*.html"
