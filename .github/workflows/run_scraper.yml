@@ -2,11 +2,11 @@ name: TradingView Scraper
 
 on:
   schedule:
-    - cron: '0 */6 * * *'
-  workflow_dispatch:
+    - cron: '0 */6 * * *'  # รันทุกๆ 6 ชั่วโมง
+  workflow_dispatch:        # อนุญาตให้รันด้วยตนเองจากแท็บ Actions
 
 jobs:
-  scrape:
+  scrape_and_report:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -15,8 +15,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # หรือเวอร์ชันที่คุณใช้
-          cache: 'pip'
+          python-version: '3.11' # หรือเวอร์ชัน Python ที่คุณต้องการใช้
+          cache: 'pip' # Cache dependencies เพื่อให้การรันครั้งต่อไปเร็วขึ้น
 
       - name: Install Python dependencies
         run: |
@@ -24,33 +24,51 @@ jobs:
           pip install -r requirements.txt
 
       - name: Setup Chrome and ChromeDriver
-        uses: browser-actions/setup-chrome@latest # Action นี้จะจัดการเรื่อง Chrome และ ChromeDriver
+        uses: browser-actions/setup-chrome@latest # Action นี้จะติดตั้ง Chrome และ ChromeDriver ที่เข้ากันได้
 
       - name: Run scraper script
         run: python scraper.py
         env:
-          PYTHONUNBUFFERED: 1 # สำคัญมากสำหรับ real-time logging
+          PYTHONUNBUFFERED: 1 # ช่วยให้ log จาก Python แสดงผลทันที
 
       - name: List files after script execution (for debugging)
-        if: always() # รันเสมอ
+        if: always() # รัน step นี้เสมอ แม้ว่า step ก่อนหน้าจะ fail เพื่อช่วย debug
         run: |
           echo "Current directory: $PWD"
-          echo "Listing all files in workspace (recursive):"
+          echo "Listing all files in GITHUB_WORKSPACE ($GITHUB_WORKSPACE) (recursive):"
           ls -R $GITHUB_WORKSPACE
           echo "--- End of file listing ---"
 
-      - name: Upload heatmap HTML results
+      - name: Upload HTML Report
         uses: actions/upload-artifact@v4
         with:
           name: heatmap-html-report
-          path: | # ใช้ multi-line path เพื่อความชัดเจน หรือถ้ามีหลายไฟล์/pattern
-            heatmap_output.html
-            heatmap_no_data.html # ถ้าคุณสร้างไฟล์นี้ด้วย
-          if-no-files-found: warn # หรือ 'error' ถ้าการไม่มีไฟล์นี้ถือว่าล้มเหลว
+          path: heatmap_output.html # ระบุชื่อไฟล์ HTML ที่สคริปต์ของคุณสร้าง
+          if-no-files-found: warn  # เปลี่ยนเป็น 'error' ถ้าการไม่มีไฟล์นี้ถือว่า workflow ล้มเหลว
 
-      - name: Upload heatmap CSV data
+      - name: Upload CSV Data
         uses: actions/upload-artifact@v4
         with:
           name: heatmap-csv-data
-          path: heatmap_data.csv
-          if-no-files-found: warn
+          path: heatmap_data.csv   # ระบุชื่อไฟล์ CSV ที่สคริปต์ของคุณสร้าง
+          if-no-files-found: warn  # เปลี่ยนเป็น 'error' ถ้าการไม่มีไฟล์นี้ถือว่า workflow ล้มเหลว
+
+      # --- (ทางเลือก) ถ้าต้องการ Deploy ไปยัง GitHub Pages ---
+      # - name: Setup Pages
+      #   if: github.ref == 'refs/heads/main' # รันเฉพาะเมื่อ push ไปยัง branch 'main'
+      #   uses: actions/configure-pages@v4
+      #   # permissions:
+      #   #   pages: write
+      #   #   id-token: write
+      #   # (permissions เหล่านี้ควรจะอยู่ที่ระดับ job หรือ workflow ถ้าต้องการใช้)
+
+      # - name: Upload artifact for GitHub Pages
+      #   if: github.ref == 'refs/heads/main'
+      #   uses: actions/upload-pages-artifact@v3 # หรือเวอร์ชันล่าสุดที่รองรับ
+      #   with:
+      #     path: ./heatmap_output.html # Path ไปยังไฟล์หรือโฟลเดอร์ที่จะ deploy
+
+      # - name: Deploy to GitHub Pages
+      #   if: github.ref == 'refs/heads/main'
+      #   id: deployment
+      #   uses: actions/deploy-pages@v4
