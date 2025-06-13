@@ -2,8 +2,8 @@ name: TradingView Scraper
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Every 6 hours
-  workflow_dispatch:  # Manual trigger
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
 
 jobs:
   scrape:
@@ -13,49 +13,44 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5 # อัปเดตเป็น v5 ซึ่งเป็นเวอร์ชันล่าสุด
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip' # เพิ่มการ cache pip dependencies เพื่อให้รันครั้งต่อไปเร็วขึ้น
+          python-version: '3.11' # หรือเวอร์ชันที่คุณใช้
+          cache: 'pip'
 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # วิธีที่ 1: ใช้ Action สำเร็จรูปในการติดตั้ง Chrome และ ChromeDriver (แนะนำ)
       - name: Setup Chrome and ChromeDriver
-        uses: browser-actions/setup-chrome@latest
-        # action นี้จะติดตั้ง Google Chrome stable และ ChromeDriver ที่เข้ากันได้
-        # และเพิ่ม ChromeDriver ไปยัง PATH โดยอัตโนมัติ
-
-      # วิธีที่ 2: ติดตั้งด้วยตนเอง (ถ้าไม่ต้องการใช้ Action เพิ่มเติม)
-      # - name: Install Google Chrome
-      #   run: |
-      #     sudo apt-get update
-      #     sudo apt-get install -y google-chrome-stable
-      # - name: Install ChromeDriver (ตัวอย่างสำหรับ Chrome 114, อาจต้องปรับตามเวอร์ชัน Chrome ที่ติดตั้ง)
-      #   run: |
-      #     CHROME_DRIVER_VERSION=$(curl -sS https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE) # หาเวอร์ชันล่าสุด
-      #     wget -N https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/${CHROME_DRIVER_VERSION}/linux64/chromedriver-linux64.zip -P ~/
-      #     unzip ~/chromedriver-linux64.zip -d ~/
-      #     rm ~/chromedriver-linux64.zip
-      #     sudo mv -f ~/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver
-      #     sudo chown root:root /usr/local/bin/chromedriver
-      #     sudo chmod +x /usr/local/bin/chromedriver
-      #   # หมายเหตุ: การจัดการ ChromeDriver ด้วยตนเองอาจซับซ้อนเรื่องเวอร์ชัน
-      #   # Selenium Manager (ใน Selenium 4.6+) ควรจะช่วยได้ถ้า Chrome ถูกติดตั้งแล้ว
-      #   # แต่การระบุชัดเจนมักจะดีกว่าใน CI
+        uses: browser-actions/setup-chrome@latest # Action นี้จะจัดการเรื่อง Chrome และ ChromeDriver
 
       - name: Run scraper script
         run: python scraper.py
         env:
-          PYTHONUNBUFFERED: 1 # ช่วยให้ log จาก Python แสดงผลทันทีใน GitHub Actions
+          PYTHONUNBUFFERED: 1 # สำคัญมากสำหรับ real-time logging
 
-      - name: Upload heatmap results
+      - name: List files after script execution (for debugging)
+        if: always() # รันเสมอ
+        run: |
+          echo "Current directory: $PWD"
+          echo "Listing all files in workspace (recursive):"
+          ls -R $GITHUB_WORKSPACE
+          echo "--- End of file listing ---"
+
+      - name: Upload heatmap HTML results
         uses: actions/upload-artifact@v4
         with:
-          name: heatmap-results
-          path: "*.html" # หรือระบุชื่อไฟล์ที่เจาะจง เช่น heatmap_output.html
-          if-no-files-found: warn # เปลี่ยนเป็น 'warn' หรือ 'error' ตามความต้องการ
-                                  # 'warn' จะไม่ทำให้ job fail ถ้าไม่พบไฟล์
+          name: heatmap-html-report
+          path: | # ใช้ multi-line path เพื่อความชัดเจน หรือถ้ามีหลายไฟล์/pattern
+            heatmap_output.html
+            heatmap_no_data.html # ถ้าคุณสร้างไฟล์นี้ด้วย
+          if-no-files-found: warn # หรือ 'error' ถ้าการไม่มีไฟล์นี้ถือว่าล้มเหลว
+
+      - name: Upload heatmap CSV data
+        uses: actions/upload-artifact@v4
+        with:
+          name: heatmap-csv-data
+          path: heatmap_data.csv
+          if-no-files-found: warn

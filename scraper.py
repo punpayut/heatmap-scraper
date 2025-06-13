@@ -9,6 +9,7 @@ from selenium.webdriver.support import expected_conditions as EC
 import pandas as pd
 from datetime import datetime
 import re
+import os
 
 class TradingViewHeatmapScraper:
     def __init__(self, headless=True):
@@ -477,35 +478,53 @@ class TradingViewHeatmapScraper:
 
 # Usage example
 def main():
-    scraper = TradingViewHeatmapScraper(headless=True)  # Set to True for headless mode
-    
+    print("DEBUG: Starting main function...") # เพิ่ม log
+    scraper = TradingViewHeatmapScraper(headless=True)
+    heatmap_data = [] # khởi tạoเป็น list ว่าง
+    html_file_generated = False # flag
+
     try:
-        # Scrape stock heatmap data
-        print("Scraping TradingView heatmap...")
+        print("DEBUG: Scraping TradingView heatmap...")
         heatmap_data = scraper.scrape_heatmap_data(market="stock", screener="america")
-        
+
         if heatmap_data:
-            print(f"Found {len(heatmap_data)} stocks")
-            
-            # Display first few results
-            for i, stock in enumerate(heatmap_data[:5]):
-                print(f"{i+1}. {stock['symbol']}: {stock['name']} - {stock['change']}")
-            
-            # Save to CSV
-            scraper.save_to_csv(heatmap_data)
-            
-            # Convert to DataFrame for analysis
-            df = pd.DataFrame(heatmap_data)
-            print("\nSummary statistics:")
-            print(df.describe())
-            
+            print(f"DEBUG: Found {len(heatmap_data)} stocks.")
+            # ... (ส่วนแสดงผลและ save_to_csv เหมือนเดิม) ...
+            scraper.save_to_csv(heatmap_data, "heatmap_data.csv") # ตรวจสอบให้แน่ใจว่าชื่อไฟล์ถูกต้อง
+            print(f"DEBUG: CSV data saved to heatmap_data.csv")
+
+            print("DEBUG: Attempting to generate HTML output...")
+            # เรียก generate_html_output โดยตรงด้วยชื่อไฟล์ที่คาดหวัง
+            html_filename = "heatmap_output.html"
+            actual_html_file = scraper.generate_html_output(heatmap_data, html_filename)
+            if actual_html_file and os.path.exists(actual_html_file):
+                print(f"DEBUG: HTML report successfully generated at {os.path.abspath(actual_html_file)}")
+                html_file_generated = True
+            else:
+                print(f"DEBUG: HTML report generation failed or file not found at expected location: {html_filename}")
         else:
-            print("No data found")
-            
+            print("DEBUG: No heatmap data found. Scraper might have failed to retrieve data.")
+            # คุณอาจจะยังต้องการสร้าง HTML เปล่าๆ หรือ report ที่บอกว่าไม่มีข้อมูล
+            print("DEBUG: Attempting to generate an empty/error HTML report...")
+            html_filename = "heatmap_no_data.html" # หรือชื่ออื่น
+            # ส่ง list ว่างไปก็ได้ หรือสร้าง data dummy
+            actual_html_file = scraper.generate_html_output([], html_filename)
+            if actual_html_file and os.path.exists(actual_html_file):
+                print(f"DEBUG: Empty/Error HTML report successfully generated at {os.path.abspath(actual_html_file)}")
+                # html_file_generated = True # ตั้งค่าตามต้องการ
+            else:
+                print(f"DEBUG: Empty/Error HTML report generation failed.")
+
+
     except Exception as e:
-        print(f"Error in main: {e}")
+        print(f"CRITICAL ERROR in main: {e}") # ทำให้ error นี้เด่นขึ้น
+        import traceback
+        traceback.print_exc() # พิมพ์ stack trace เต็มๆ
+
     finally:
+        print("DEBUG: In finally block. Closing scraper.")
         scraper.close()
+        print(f"DEBUG: Scraper closed. HTML file generated status: {html_file_generated}")
 
 if __name__ == "__main__":
     main()
